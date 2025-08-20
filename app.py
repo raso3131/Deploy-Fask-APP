@@ -1,9 +1,10 @@
-import os
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 app = Flask(__name__)
+
+app.secret_key="supersecret123"
 
 # Veritabanı bağlantısı (/tmp/ altına taşındı)
 db_path = os.path.join("/tmp", "cafe.db")
@@ -401,4 +402,3 @@ def clear_sales():
 
 if __name__ == '__main__':
     app.run()
-
