@@ -4,8 +4,9 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Veritabanı bağlantısı
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafe.db'
+# Veritabanı bağlantısı (/tmp/ altına taşındı)
+db_path = os.path.join("/tmp", "cafe.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
