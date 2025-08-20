@@ -3,7 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
 
 # Veritabanı bağlantısı
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafe.db'
@@ -399,4 +398,4 @@ def clear_sales():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
