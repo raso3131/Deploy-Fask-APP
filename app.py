@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -402,3 +403,4 @@ def clear_sales():
 
 if __name__ == '__main__':
     app.run()
+
