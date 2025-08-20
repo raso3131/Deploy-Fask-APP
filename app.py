@@ -46,6 +46,17 @@ class Satis(db.Model):
     toplam = db.Column(db.Float)
     tarih = db.Column(db.DateTime, default=datetime.utcnow)
 
+# EKLENEN: Envanter Modeli
+class Envanter(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    urun_id = db.Column(db.Integer, db.ForeignKey('urun.id'))
+    baslangic_stok = db.Column(db.Integer)
+    kalan_stok = db.Column(db.Integer)
+    tarih = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # İlişki
+    urun = db.relationship('Urun', backref='envanter')
+
 # Veritabanı tablosunu oluştur ve örnek veri ekle
 with app.app_context():
     db.create_all()
@@ -236,7 +247,7 @@ def delete_order(siparis_id):
     flash('Sipariş başarıyla silindi!', 'success')
     return redirect(request.referrer or url_for('management'))
 
-# Hesap kapatma
+# Hesap kapatma - GÜNCELLENMIŞ: Envanter güncelleme eklendi
 @app.route('/close_bill/<int:masa_id>')
 def close_bill(masa_id):
     masa = Masa.query.get_or_404(masa_id)
@@ -246,7 +257,7 @@ def close_bill(masa_id):
         flash('Bu masada kapatılacak sipariş yok!', 'error')
         return redirect(request.referrer or url_for('management'))
     
-    # Satışlara kaydet
+    # Satışlara kaydet ve envanteri güncelle
     toplam_tutar = 0
     for siparis in siparisler:
         tutar = siparis.adet * siparis.urun.fiyat
@@ -258,6 +269,14 @@ def close_bill(masa_id):
         )
         db.session.add(satis)
         toplam_tutar += tutar
+        
+        # Envanteri güncelle - stoktan düş
+        envanter_item = Envanter.query.filter_by(urun_id=siparis.urun_id).first()
+        if envanter_item:
+            if envanter_item.kalan_stok >= siparis.adet:
+                envanter_item.kalan_stok -= siparis.adet
+            else:
+                envanter_item.kalan_stok = 0  # Stok eksilere düşmesin
     
     # Siparişleri sil
     for siparis in siparisler:
@@ -299,12 +318,76 @@ def api_masa_detay(masa_id):
         'toplam': toplam
     })
 
-# Satış raporu
+# Satış raporu - DÜZELTILMIŞ: Envanter bilgileri eklendi
 @app.route('/report')
 def report():
     satislar = Satis.query.order_by(Satis.tarih.desc()).all()
     toplam_ciro = sum(satis.toplam for satis in satislar)
-    return render_template('report.html', satislar=satislar, toplam_ciro=toplam_ciro)
+    urunler = Urun.query.all()
+    envanter_listesi = Envanter.query.all()
+    
+    # Envanter bilgilerini hazırla
+    envanter_bilgileri = []
+    for envanter in envanter_listesi:
+        # Bu ürün için toplam satış miktarını hesapla
+        toplam_satis = sum(satis.adet for satis in satislar if satis.urun_isim == envanter.urun.isim)
+        tüketilen = envanter.baslangic_stok - envanter.kalan_stok
+        
+        envanter_bilgileri.append({
+            'envanter': envanter,
+            'tüketilen': tüketilen,
+            'yuzde': (tüketilen / envanter.baslangic_stok * 100) if envanter.baslangic_stok > 0 else 0
+        })
+    
+    return render_template('report.html', 
+                         satislar=satislar, 
+                         toplam_ciro=toplam_ciro,
+                         urunler=urunler,
+                         envanter_bilgileri=envanter_bilgileri)
+
+# EKLENEN: Envanter ekleme
+@app.route('/add_envanter', methods=['POST'])
+def add_envanter():
+    urun_id = request.form['urun_id']
+    stok_miktari = request.form['stok_miktari']
+    
+    if urun_id and stok_miktari:
+        try:
+            stok_int = int(stok_miktari)
+            if stok_int >= 0:
+                # Aynı ürün varsa güncelle, yoksa yeni ekle
+                mevcut_envanter = Envanter.query.filter_by(urun_id=urun_id).first()
+                if mevcut_envanter:
+                    mevcut_envanter.baslangic_stok = stok_int
+                    mevcut_envanter.kalan_stok = stok_int
+                    mevcut_envanter.tarih = datetime.utcnow()
+                else:
+                    yeni_envanter = Envanter(
+                        urun_id=urun_id,
+                        baslangic_stok=stok_int,
+                        kalan_stok=stok_int
+                    )
+                    db.session.add(yeni_envanter)
+                
+                db.session.commit()
+                flash('Envanter başarıyla eklendi/güncellendi!', 'success')
+            else:
+                flash('Stok miktarı 0 veya pozitif olmalı!', 'error')
+        except ValueError:
+            flash('Geçersiz stok miktarı formatı!', 'error')
+    else:
+        flash('Ürün ve stok miktarı gerekli!', 'error')
+    
+    return redirect(url_for('report'))
+
+# EKLENEN: Envanter silme
+@app.route('/delete_envanter/<int:envanter_id>')
+def delete_envanter(envanter_id):
+    envanter = Envanter.query.get_or_404(envanter_id)
+    db.session.delete(envanter)
+    db.session.commit()
+    flash('Envanter kaydı başarıyla silindi!', 'success')
+    return redirect(url_for('report'))
 
 # Satış verilerini temizle
 @app.route('/clear_sales', methods=['POST'])
