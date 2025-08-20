@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Yönetim Paneli - E-Adisyon{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-cogs"></i> Yönetim Paneli</h1>
+        <p>Masa ve menü yönetimi, sipariş alma</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab-list">
+            <button class="tab-button active" data-tab="masalar">
+                <i class="fas fa-chair"></i>
+                Masalar
+            </button>
+            <button class="tab-button" data-tab="menu">
+                <i class="fas fa-utensils"></i>
+                Menü Yönetimi
+            </button>
+            <button class="tab-button" data-tab="siparisler">
+                <i class="fas fa-shopping-cart"></i>
+                Sipariş Alma
+            </button>
+        </div>
+
+        <!-- Masalar Tab -->
+        <div class="tab-content active" id="masalar">
+            <!-- Masa Ekleme Formu -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-plus"></i> Yeni Masa Ekle</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('add_masa') }}" class="form-inline">
+                        <div class="form-group">
+                            <label for="kat">Kat:</label>
+                            <input type="text" id="kat" name="kat" placeholder="Örn: 1, 2, bahçe" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Masa Ekle
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Masalar Grid -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chair"></i> Mevcut Masalar</h3>
+                </div>
+                <div class="card-body">
+                    <div class="masa-grid">
+                        {% for info in masa_bilgileri %}
+                            <div class="masa-card {% if info.masa.siparis_durum == 0 %}empty{% else %}occupied{% endif %}">
+                                <div class="masa-header">
+                                    <div class="masa-info">
+                                        <h4>Masa {{ info.masa.id }}</h4>
+                                        <span class="masa-kat">{{ info.masa.kat }}. Kat</span>
+                                    </div>
+                                    <div class="masa-actions">
+                                        <span class="masa-status {% if info.masa.siparis_durum == 0 %}empty{% else %}occupied{% endif %}">
+                                            {% if info.masa.siparis_durum == 0 %}Boş{% else %}Dolu{% endif %}
+                                        </span>
+                                        <a href="{{ url_for('delete_masa', masa_id=info.masa.id) }}" 
+                                           class="btn btn-danger btn-sm" 
+                                           onclick="return confirm('Bu masayı silmek istediğinizden emin misiniz?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                
+                                {% if info.siparisler %}
+                                    <div class="masa-orders">
+                                        <h5>Siparişler:</h5>
+                                        {% for siparis in info.siparisler %}
+                                            <div class="order-item">
+                                                <span>{{ siparis.urun.isim }} x{{ siparis.adet }}</span>
+                                                <span>{{ "%.2f"|format(siparis.adet * siparis.urun.fiyat) }} TL</span>
+                                                <a href="{{ url_for('delete_order', siparis_id=siparis.id) }}" 
+                                                   class="btn btn-danger btn-xs"
+                                                   onclick="return confirm('Bu siparişi silmek istediğinizden emin misiniz?')">
+                                                    <i class="fas fa-times"></i>
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                        <div class="order-total">
+                                            <strong>Toplam: {{ "%.2f"|format(info.toplam) }} TL</strong>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menü Tab -->
+        <div class="tab-content" id="menu">
+            <!-- Ürün Ekleme Formu -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-plus"></i> Yeni Ürün Ekle</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('add_urun') }}" class="form-inline">
+                        <div class="form-group">
+                            <label for="isim">Ürün Adı:</label>
+                            <input type="text" id="isim" name="isim" placeholder="Örn: Çay, Kahve" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fiyat">Fiyat (TL):</label>
+                            <input type="number" id="fiyat" name="fiyat" step="0.01" placeholder="0.00" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Ürün Ekle
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Ürünler Listesi -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> Menü Listesi</h3>
+                </div>
+                <div class="card-body">
+                    <div class="menu-grid">
+                        {% for urun in urunler %}
+                            <div class="menu-item">
+                                <div class="menu-info">
+                                    <h4>{{ urun.isim }}</h4>
+                                    <span class="menu-price">{{ "%.2f"|format(urun.fiyat) }} TL</span>
+                                </div>
+                                <a href="{{ url_for('delete_urun', urun_id=urun.id) }}" 
+                                   class="btn btn-danger btn-sm"
+                                   onclick="return confirm('Bu ürünü silmek istediğinizden emin misiniz?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sipariş Alma Tab -->
+        <div class="tab-content" id="siparisler">
+            <div class="siparis-container">
+                <div class="masa-selection">
+                    <h3><i class="fas fa-chair"></i> Masalar</h3>
+                    <div class="masa-grid-simple">
+                        {% for info in masa_bilgileri %}
+                            <div class="masa-card-simple {% if info.masa.siparis_durum == 0 %}empty{% else %}occupied{% endif %}" 
+                                 data-masa-id="{{ info.masa.id }}" 
+                                 onclick="selectMasa({{ info.masa.id }})">
+                                <div class="masa-number">{{ info.masa.id }}</div>
+                                <div class="masa-kat">{{ info.masa.kat }}. Kat</div>
+                                {% if info.siparisler %}
+                                    <div class="masa-orders-count">{{ info.siparis_sayisi }} sipariş</div>
+                                    <div class="masa-total">{{ "%.2f"|format(info.toplam) }} TL</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="order-panel">
+                    <div id="selected-masa-info" class="selected-masa" style="display: none;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 id="masa-title">Masa Seçin</h3>
+                                <button id="close-bill-btn" class="btn btn-danger" style="display: none;" onclick="closeBill()">
+                                    <i class="fas fa-receipt"></i>
+                                    Hesabı Kapat
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <!-- Sipariş Ekleme Formu -->
+                                <form id="order-form" method="POST" action="{{ url_for('add_order') }}" style="display: none;">
+                                    <input type="hidden" id="masa-id-input" name="masa_id">
+                                    <div class="form-group">
+                                        <label for="urun_id">Ürün Seç:</label>
+                                        <select id="urun_id" name="urun_id" required>
+                                            <option value="">Ürün seçin...</option>
+                                            {% for urun in urunler %}
+                                                <option value="{{ urun.id }}">{{ urun.isim }} - {{ "%.2f"|format(urun.fiyat) }} TL</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="adet">Adet:</label>
+                                        <input type="number" id="adet" name="adet" value="1" min="1" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-plus"></i>
+                                        Sipariş Ekle
+                                    </button>
+                                </form>
+
+                                <!-- Masa Siparişleri -->
+                                <div id="masa-orders" class="masa-orders-detail">
+                                    <!-- JavaScript ile doldurulacak -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Tab sistemi
+document.querySelectorAll('.tab-button').forEach(button => {
+    button.addEventListener('click', () => {
+        const tabName = button.dataset.tab;
+        
+        // Tüm tabları gizle
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Seçilen tabı göster
+        document.getElementById(tabName).classList.add('active');
+        button.classList.add('active');
+    });
+});
+
+// Masa seçimi
+let selectedMasaId = null;
+
+function selectMasa(masaId) {
+    selectedMasaId = masaId;
+    
+    // Tüm masa kartlarından active sınıfını kaldır
+    document.querySelectorAll('.masa-card-simple').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    // Seçilen masa kartına active sınıfını ekle
+    document.querySelector(`[data-masa-id="${masaId}"]`).classList.add('active');
+    
+    // Masa bilgilerini göster
+    document.getElementById('selected-masa-info').style.display = 'block';
+    document.getElementById('masa-title').textContent = `Masa ${masaId}`;
+    document.getElementById('masa-id-input').value = masaId;
+    document.getElementById('order-form').style.display = 'block';
+    
+    // Masa detaylarını yükle
+    loadMasaDetails(masaId);
+}
+
+function loadMasaDetails(masaId) {
+    fetch(`/api/masa/${masaId}`)
+        .then(response => response.json())
+        .then(data => {
+            const ordersContainer = document.getElementById('masa-orders');
+            
+            if (data.siparisler.length > 0) {
+                let ordersHTML = '<h5>Mevcut Siparişler:</h5><div class="orders-list">';
+                
+                data.siparisler.forEach(siparis => {
+                    ordersHTML += `
+                        <div class="order-item">
+                            <span>${siparis.urun_isim} x${siparis.adet}</span>
+                            <span>${siparis.tutar.toFixed(2)} TL</span>
+                            <a href="/delete_order/${siparis.id}" class="btn btn-danger btn-xs" 
+                               onclick="return confirm('Bu siparişi silmek istediğinizden emin misiniz?')">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </div>
+                    `;
+                });
+                
+                ordersHTML += `</div><div class="order-total"><strong>Toplam: ${data.toplam.toFixed(2)} TL</strong></div>`;
+                ordersContainer.innerHTML = ordersHTML;
+                
+                document.getElementById('close-bill-btn').style.display = 'block';
+            } else {
+                ordersContainer.innerHTML = '<p class="no-orders">Bu masada henüz sipariş yok.</p>';
+                document.getElementById('close-bill-btn').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Masa detayları yüklenirken hata:', error);
+        });
+}
+
+function closeBill() {
+    if (selectedMasaId && confirm('Bu masanın hesabını kapatmak istediğinizden emin misiniz?')) {
+        window.location.href = `/close_bill/${selectedMasaId}`;
+    }
+}
+
+// Flash mesajları otomatik kapatma
+setTimeout(() => {
+    document.querySelectorAll('.flash').forEach(flash => {
+        flash.remove();
+    });
+}, 5000);
+</script>
+{% endblock %}

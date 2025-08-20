@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Garson Paneli - E-Adisyon{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-users"></i> Garson Paneli</h1>
+        <p>Sipariş alma ve masa yönetimi</p>
+    </div>
+
+    <!-- Masalar Grid -->
+    <div class="masa-grid worker-grid">
+        {% for info in masa_bilgileri %}
+            <div class="masa-card {% if info.masa.siparis_durum == 0 %}empty{% else %}occupied{% endif %} worker-card"
+                 data-masa-id="{{ info.masa.id }}"
+                 onclick="openOrderModal({{ info.masa.id }}, '{{ info.masa.kat }}')">
+                <div class="masa-header">
+                    <div class="masa-info">
+                        <h3>Masa {{ info.masa.id }}</h3>
+                        <span class="masa-kat">{{ info.masa.kat }}. Kat</span>
+                    </div>
+                    <span class="masa-status {% if info.masa.siparis_durum == 0 %}empty{% else %}occupied{% endif %}">
+                        {% if info.masa.siparis_durum == 0 %}Boş{% else %}Dolu{% endif %}
+                    </span>
+                </div>
+                
+                {% if info.siparisler %}
+                    <div class="masa-orders">
+                        <div class="orders-summary">
+                            <span class="order-count">{{ info.siparis_sayisi }} sipariş</span>
+                            <span class="order-total">{{ "%.2f"|format(info.toplam) }} TL</span>
+                        </div>
+                        <div class="recent-orders">
+                            {% for siparis in info.siparisler[:3] %}
+                                <div class="recent-order">{{ siparis.urun.isim }} x{{ siparis.adet }}</div>
+                            {% endfor %}
+                            {% if info.siparisler|length > 3 %}
+                                <div class="more-orders">+{{ info.siparisler|length - 3 }} daha...</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-table">
+                        <i class="fas fa-utensils"></i>
+                        <span>Sipariş ver</span>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Sipariş Modal -->
+<div id="orderModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Masa Siparişi</h3>
+            <button class="modal-close" onclick="closeOrderModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <!-- Sipariş Ekleme Formu -->
+            <div class="order-form-section">
+                <h4><i class="fas fa-plus"></i> Yeni Sipariş</h4>
+                <form id="modalOrderForm" method="POST" action="{{ url_for('add_order') }}">
+                    <input type="hidden" id="modalMasaId" name="masa_id">
+                    <div class="form-row">
+                        <div class="form-group flex-grow">
+                            <label for="modalUrunId">Ürün Seç:</label>
+                            <select id="modalUrunId" name="urun_id" required>
+                                <option value="">Ürün seçin...</option>
+                                {% for urun in urunler %}
+                                    <option value="{{ urun.id }}" data-price="{{ urun.fiyat }}">
+                                        {{ urun.isim }} - {{ "%.2f"|format(urun.fiyat) }} TL
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalAdet">Adet:</label>
+                            <input type="number" id="modalAdet" name="adet" value="1" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i>
+                                Ekle
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Mevcut Siparişler -->
+            <div id="modalOrders" class="current-orders-section">
+                <!-- JavaScript ile doldurulacak -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div id="modalTotal" class="modal-total"></div>
+            <div class="modal-actions">
+                <button id="closeBillBtn" class="btn btn-danger" onclick="closeBillFromModal()" style="display: none;">
+                    <i class="fas fa-receipt"></i>
+                    Hesabı Kapat
+                </button>
+                <button class="btn btn-secondary" onclick="closeOrderModal()">
+                    <i class="fas fa-check"></i>
+                    Tamam
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Backdrop -->
+<div id="modalBackdrop" class="modal-backdrop" onclick="closeOrderModal()"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentMasaId = null;
+
+function openOrderModal(masaId, kat) {
+    currentMasaId = masaId;
+    document.getElementById('modalTitle').textContent = `Masa ${masaId} - ${kat}. Kat`;
+    document.getElementById('modalMasaId').value = masaId;
+    document.getElementById('orderModal').classList.add('active');
+    document.getElementById('modalBackdrop').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Formu sıfırla
+    document.getElementById('modalOrderForm').reset();
+    document.getElementById('modalMasaId').value = masaId;
+    
+    // Masa siparişlerini yükle
+    loadModalMasaDetails(masaId);
+}
+
+function closeOrderModal() {
+    document.getElementById('orderModal').classList.remove('active');
+    document.getElementById('modalBackdrop').classList.remove('active');
+    document.body.style.overflow = 'auto';
+    currentMasaId = null;
+    
+    // Sayfayı yenile (siparişlerin güncel görünmesi için)
+    window.location.reload();
+}
+
+function loadModalMasaDetails(masaId) {
+    fetch(`/api/masa/${masaId}`)
+        .then(response => response.json())
+        .then(data => {
+            const ordersContainer = document.getElementById('modalOrders');
+            const totalContainer = document.getElementById('modalTotal');
+            const closeBillBtn = document.getElementById('closeBillBtn');
+            
+            if (data.siparisler.length > 0) {
+                let ordersHTML = '<h4><i class="fas fa-list"></i> Mevcut Siparişler</h4><div class="orders-list">';
+                
+                data.siparisler.forEach(siparis => {
+                    ordersHTML += `
+                        <div class="order-item">
+                            <div class="order-info">
+                                <span class="order-name">${siparis.urun_isim}</span>
+                                <span class="order-quantity">x${siparis.adet}</span>
+                            </div>
+                            <div class="order-actions">
+                                <span class="order-price">${siparis.tutar.toFixed(2)} TL</span>
+                                <a href="/delete_order/${siparis.id}" class="btn btn-danger btn-xs" 
+                                   onclick="return confirm('Bu siparişi silmek istediğinizden emin misiniz?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                ordersHTML += '</div>';
+                ordersContainer.innerHTML = ordersHTML;
+                
+                totalContainer.innerHTML = `<strong>Toplam: ${data.toplam.toFixed(2)} TL</strong>`;
+                closeBillBtn.style.display = 'block';
+            } else {
+                ordersContainer.innerHTML = '<div class="no-orders"><i class="fas fa-info-circle"></i> Bu masada henüz sipariş yok.</div>';
+                totalContainer.innerHTML = '';
+                closeBillBtn.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Masa detayları yüklenirken hata:', error);
+            ordersContainer.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Veriler yüklenirken hata oluştu.</div>';
+        });
+}
+
+function closeBillFromModal() {
+    if (currentMasaId && confirm('Bu masanın hesabını kapatmak istediğinizden emin misiniz?')) {
+        window.location.href = `/close_bill/${currentMasaId}`;
+    }
+}
+
+// Form submit olayını yakala ve modal'ı yenile
+document.getElementById('modalOrderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    fetch('/add_order', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            // Formu sıfırla
+            this.reset();
+            document.getElementById('modalMasaId').value = currentMasaId;
+            document.getElementById('modalAdet').value = 1;
+            
+            // Masa detaylarını yenile
+            loadModalMasaDetails(currentMasaId);
+            
+            // Başarı mesajı göster
+            showToast('Sipariş başarıyla eklendi!', 'success');
+        } else {
+            showToast('Sipariş eklenirken hata oluştu!', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Sipariş eklenirken hata:', error);
+        showToast('Sipariş eklenirken hata oluştu!', 'error');
+    });
+});
+
+// Toast bildirimleri
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        ${message}
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Animasyon için timeout
+    setTimeout(() => toast.classList.add('show'), 100);
+    
+    // Otomatik kaldırma
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Flash mesajları otomatik kapatma
+setTimeout(() => {
+    document.querySelectorAll('.flash').forEach(flash => {
+        flash.remove();
+    });
+}, 5000);
+</script>
+{% endblock %}
