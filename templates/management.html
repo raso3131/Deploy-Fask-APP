@@ -65,6 +65,20 @@
                                         <span class="masa-status {% if info.masa.siparis_durum == 0 %}empty{% else %}occupied{% endif %}">
                                             {% if info.masa.siparis_durum == 0 %}Boş{% else %}Dolu{% endif %}
                                         </span>
+                                        <!-- YENİ: 3 Nokta Transfer Butonu -->
+                                        {% if info.masa.siparis_durum == 1 %}
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline dropdown-toggle" onclick="toggleTransferMenu({{ info.masa.id }})">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <div class="dropdown-menu" id="transfer-menu-{{ info.masa.id }}">
+                                                    <button onclick="openTransferModal({{ info.masa.id }})" class="dropdown-item">
+                                                        <i class="fas fa-exchange-alt"></i>
+                                                        Masa Transfer Et
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% endif %}
                                         <a href="{{ url_for('delete_masa', masa_id=info.masa.id) }}" 
                                            class="btn btn-danger btn-sm" 
                                            onclick="return confirm('Bu masayı silmek istediğinizden emin misiniz?')">
@@ -215,16 +229,222 @@
         </div>
     </div>
 </div>
+
+<!-- YENİ: Transfer Modal -->
+<div id="transferModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="transferModalTitle">Masa Transfer Et</h3>
+            <button class="modal-close" onclick="closeTransferModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="transferForm" method="POST" action="{{ url_for('transfer_table') }}">
+                <input type="hidden" id="kaynakMasaId" name="kaynak_masa_id">
+                
+                <div class="transfer-info">
+                    <p><strong>Kaynak Masa:</strong> <span id="kaynakMasaInfo"></span></p>
+                    <p><strong>Hedef Masa Seçin:</strong></p>
+                </div>
+                
+                <div class="hedef-masa-grid">
+                    {% for info in masa_bilgileri %}
+                        {% if info.masa.siparis_durum == 0 %}
+                            <label class="hedef-masa-option">
+                                <input type="radio" name="hedef_masa_id" value="{{ info.masa.id }}" required>
+                                <div class="hedef-masa-card">
+                                    <div class="masa-number">{{ info.masa.id }}</div>
+                                    <div class="masa-kat">{{ info.masa.kat }}. Kat</div>
+                                    <div class="masa-status-badge">Boş</div>
+                                </div>
+                            </label>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">İptal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-exchange-alt"></i>
+                        Transfer Et
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Backdrop -->
+<div id="modalBackdrop" class="modal-backdrop" onclick="closeTransferModal()"></div>
+
+<!-- YENİ STİLLER -->
+<style>
+/* Transfer Modal Stilleri */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-toggle {
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 150px;
+    z-index: 1000;
+    display: none;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-item {
+    width: 100%;
+    padding: 10px 15px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+    background: #f1f5f9;
+}
+
+.transfer-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border-left: 4px solid #3b82f6;
+}
+
+.hedef-masa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.hedef-masa-option {
+    cursor: pointer;
+}
+
+.hedef-masa-option input[type="radio"] {
+    display: none;
+}
+
+.hedef-masa-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    transition: all 0.3s ease;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+}
+
+.hedef-masa-option input[type="radio"]:checked + .hedef-masa-card {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.hedef-masa-card .masa-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #1e293b;
+    margin-bottom: 5px;
+}
+
+.hedef-masa-card .masa-kat {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.masa-status-badge {
+    background: #10b981;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* Boş masa seçimi için ek stiller */
+.no-empty-tables {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+
+.no-empty-tables i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    color: #d1d5db;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .hedef-masa-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+    }
+    
+    .modal-actions {
+        flex-direction: column;
+    }
+    
+    .dropdown-menu {
+        left: 0;
+        right: auto;
+        min-width: 120px;
+    }
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Tab sistemi
+// Mevcut tab sistemi ve masa seçimi kodları...
 document.querySelectorAll('.tab-button').forEach(button => {
     button.addEventListener('click', () => {
         const tabName = button.dataset.tab;
         
-        // Tüm tabları gizle
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
@@ -232,33 +452,27 @@ document.querySelectorAll('.tab-button').forEach(button => {
             btn.classList.remove('active');
         });
         
-        // Seçilen tabı göster
         document.getElementById(tabName).classList.add('active');
         button.classList.add('active');
     });
 });
 
-// Masa seçimi
 let selectedMasaId = null;
 
 function selectMasa(masaId) {
     selectedMasaId = masaId;
     
-    // Tüm masa kartlarından active sınıfını kaldır
     document.querySelectorAll('.masa-card-simple').forEach(card => {
         card.classList.remove('active');
     });
     
-    // Seçilen masa kartına active sınıfını ekle
     document.querySelector(`[data-masa-id="${masaId}"]`).classList.add('active');
     
-    // Masa bilgilerini göster
     document.getElementById('selected-masa-info').style.display = 'block';
     document.getElementById('masa-title').textContent = `Masa ${masaId}`;
     document.getElementById('masa-id-input').value = masaId;
     document.getElementById('order-form').style.display = 'block';
     
-    // Masa detaylarını yükle
     loadMasaDetails(masaId);
 }
 
@@ -303,6 +517,72 @@ function closeBill() {
         window.location.href = `/close_bill/${selectedMasaId}`;
     }
 }
+
+// YENİ: Transfer işlemleri
+function toggleTransferMenu(masaId) {
+    // Önce tüm açık menüleri kapat
+    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+        if (menu.id !== `transfer-menu-${masaId}`) {
+            menu.classList.remove('show');
+        }
+    });
+    
+    // Seçilen menüyü aç/kapat
+    const menu = document.getElementById(`transfer-menu-${masaId}`);
+    menu.classList.toggle('show');
+}
+
+function openTransferModal(masaId) {
+    // Dropdown menüyü kapat
+    document.getElementById(`transfer-menu-${masaId}`).classList.remove('show');
+    
+    // Modal'ı aç
+    document.getElementById('kaynakMasaId').value = masaId;
+    document.getElementById('kaynakMasaInfo').textContent = `Masa ${masaId}`;
+    document.getElementById('transferModalTitle').textContent = `Masa ${masaId} Transfer Et`;
+    
+    // Mevcut seçimi temizle
+    document.querySelectorAll('input[name="hedef_masa_id"]').forEach(radio => {
+        radio.checked = false;
+    });
+    
+    document.getElementById('transferModal').classList.add('active');
+    document.getElementById('modalBackdrop').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTransferModal() {
+    document.getElementById('transferModal').classList.remove('active');
+    document.getElementById('modalBackdrop').classList.remove('active');
+    document.body.style.overflow = 'auto';
+}
+
+// Transfer form submit
+document.getElementById('transferForm').addEventListener('submit', function(e) {
+    const selectedHedef = document.querySelector('input[name="hedef_masa_id"]:checked');
+    if (!selectedHedef) {
+        e.preventDefault();
+        alert('Lütfen hedef masa seçin!');
+        return false;
+    }
+    
+    const kaynakMasa = document.getElementById('kaynakMasaId').value;
+    const hedefMasa = selectedHedef.value;
+    
+    if (!confirm(`Masa ${kaynakMasa} siparişlerini Masa ${hedefMasa}'e transfer etmek istediğinizden emin misiniz?`)) {
+        e.preventDefault();
+        return false;
+    }
+});
+
+// Sayfa dışına tıklanınca dropdown'ları kapat
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+        });
+    }
+});
 
 // Flash mesajları otomatik kapatma
 setTimeout(() => {
