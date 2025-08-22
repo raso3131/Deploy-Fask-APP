@@ -46,7 +46,7 @@ class Satis(db.Model):
     toplam = db.Column(db.Float)
     tarih = db.Column(db.DateTime, default=datetime.utcnow)
 
-# EKLENEN: Envanter Modeli
+# Envanter Modeli
 class Envanter(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     urun_id = db.Column(db.Integer, db.ForeignKey('urun.id'))
@@ -135,12 +135,20 @@ def worker():
     
     return render_template('worker.html', masa_bilgileri=masa_bilgileri, urunler=urunler)
 
-# Masa ekleme
+# DÜZELTILMIŞ: Masa ekleme - en küçük boş ID'den başla
 @app.route('/add_masa', methods=['POST'])
 def add_masa():
     kat = request.form['kat']
     if kat:
-        yeni_masa = Masa(kat=kat)
+        # Mevcut masa ID'lerini al
+        mevcut_idler = [masa.id for masa in Masa.query.all()]
+        
+        # En küçük eksik ID'yi bul
+        yeni_id = 1
+        while yeni_id in mevcut_idler:
+            yeni_id += 1
+        
+        yeni_masa = Masa(id=yeni_id, kat=kat)
         db.session.add(yeni_masa)
         db.session.commit()
         flash('Masa başarıyla eklendi!', 'success')
@@ -160,6 +168,59 @@ def delete_masa(masa_id):
         db.session.delete(masa)
         db.session.commit()
         flash('Masa başarıyla silindi!', 'success')
+    return redirect(url_for('management'))
+
+# YENİ: Masa transfer işlemi
+@app.route('/transfer_table', methods=['POST'])
+def transfer_table():
+    kaynak_masa_id = request.form.get('kaynak_masa_id')
+    hedef_masa_id = request.form.get('hedef_masa_id')
+    
+    if not kaynak_masa_id or not hedef_masa_id:
+        flash('Kaynak ve hedef masa seçilmelidir!', 'error')
+        return redirect(url_for('management'))
+    
+    if kaynak_masa_id == hedef_masa_id:
+        flash('Aynı masaya transfer yapılamaz!', 'error')
+        return redirect(url_for('management'))
+    
+    try:
+        kaynak_masa_id = int(kaynak_masa_id)
+        hedef_masa_id = int(hedef_masa_id)
+        
+        # Masaları kontrol et
+        kaynak_masa = Masa.query.get_or_404(kaynak_masa_id)
+        hedef_masa = Masa.query.get_or_404(hedef_masa_id)
+        
+        # Hedef masa boş olmalı
+        hedef_siparisler = Siparis.query.filter_by(masa_id=hedef_masa_id).all()
+        if hedef_siparisler:
+            flash('Hedef masa boş olmalıdır!', 'error')
+            return redirect(url_for('management'))
+        
+        # Kaynak masadaki siparişleri hedef masaya transfer et
+        kaynak_siparisler = Siparis.query.filter_by(masa_id=kaynak_masa_id).all()
+        if not kaynak_siparisler:
+            flash('Kaynak masada transfer edilecek sipariş bulunmuyor!', 'error')
+            return redirect(url_for('management'))
+        
+        # Siparişleri transfer et
+        for siparis in kaynak_siparisler:
+            siparis.masa_id = hedef_masa_id
+        
+        # Masa durumlarını güncelle
+        kaynak_masa.siparis_durum = 0
+        hedef_masa.siparis_durum = 1
+        
+        db.session.commit()
+        flash(f'Masa {kaynak_masa_id} siparişleri Masa {hedef_masa_id}\'e başarıyla transfer edildi!', 'success')
+        
+    except ValueError:
+        flash('Geçersiz masa ID\'si!', 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash('Transfer işlemi sırasında hata oluştu!', 'error')
+    
     return redirect(url_for('management'))
 
 # Ürün ekleme
@@ -247,7 +308,7 @@ def delete_order(siparis_id):
     flash('Sipariş başarıyla silindi!', 'success')
     return redirect(request.referrer or url_for('management'))
 
-# Hesap kapatma - GÜNCELLENMIŞ: Envanter güncelleme eklendi
+# Hesap kapatma - Envanter güncelleme eklendi
 @app.route('/close_bill/<int:masa_id>')
 def close_bill(masa_id):
     masa = Masa.query.get_or_404(masa_id)
@@ -318,7 +379,7 @@ def api_masa_detay(masa_id):
         'toplam': toplam
     })
 
-# Satış raporu - DÜZELTILMIŞ: Envanter bilgileri eklendi
+# Satış raporu - Envanter bilgileri eklendi
 @app.route('/report')
 def report():
     satislar = Satis.query.order_by(Satis.tarih.desc()).all()
@@ -345,7 +406,7 @@ def report():
                          urunler=urunler,
                          envanter_bilgileri=envanter_bilgileri)
 
-# EKLENEN: Envanter ekleme
+# Envanter ekleme
 @app.route('/add_envanter', methods=['POST'])
 def add_envanter():
     urun_id = request.form['urun_id']
@@ -380,7 +441,7 @@ def add_envanter():
     
     return redirect(url_for('report'))
 
-# EKLENEN: Envanter silme
+# Envanter silme
 @app.route('/delete_envanter/<int:envanter_id>')
 def delete_envanter(envanter_id):
     envanter = Envanter.query.get_or_404(envanter_id)
