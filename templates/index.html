@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Call</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Vercel Secure Call</h1>
+        <button id="joinBtn">Join Call with Rasit</button>
+        <div class="controls">
+            <button id="micBtn" class="enabled">🎤 Mic</button>
+            <button id="camBtn" class="enabled">📷 Camera</button>
+        </div>
+        <p id="status"></p>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
